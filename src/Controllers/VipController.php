@@ -25,7 +25,6 @@ final class VipController
     {
         return [
             'plans' => $this->vips->listPlans(),
-            'vips' => $this->vips->listVipEntries(),
         ];
     }
 

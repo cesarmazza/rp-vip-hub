@@ -32,7 +32,6 @@ return static function (Router $router): void {
     $router->post('/vip/suspend', [$vipController, 'suspend'], [$authMiddleware, $adminMiddleware]);
 
     $paymentController = new PaymentController();
-    $router->get('/payments', [$paymentController, 'list'], [$authMiddleware, $adminMiddleware]);
     $router->post('/payment/create', [$paymentController, 'create'], [$authMiddleware, $adminMiddleware]);
     $router->post('/payment/confirm', [$paymentController, 'confirm'], [$authMiddleware, $adminMiddleware]);
 

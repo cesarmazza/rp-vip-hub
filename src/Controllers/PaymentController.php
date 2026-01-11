@@ -46,7 +46,7 @@ final class PaymentController
             ];
         }
 
-        $payment = $this->payments->createPending($userId, $planId, (float) $plan['price'], $method);
+        $payment = $this->payments->createPending($userId, (float) $plan['price'], $method);
         $this->logs->create('payment_create', $userId, [
             'payment_id' => $payment['id'],
             'vip_plan_id' => $planId,
@@ -70,10 +70,10 @@ final class PaymentController
         $paymentId = isset($payload['payment_id']) ? (int) $payload['payment_id'] : 0;
         $planId = isset($payload['vip_plan_id']) ? (int) $payload['vip_plan_id'] : 0;
 
-        if ($paymentId === 0) {
+        if ($paymentId === 0 || $planId === 0) {
             return [
                 'status' => 422,
-                'data' => ['error' => 'payment_id e obrigatorio.'],
+                'data' => ['error' => 'payment_id e vip_plan_id sao obrigatorios.'],
             ];
         }
 
@@ -94,15 +94,7 @@ final class PaymentController
             ];
         }
 
-        $resolvedPlanId = $planId > 0 ? $planId : (int) ($payment['vip_plan_id'] ?? 0);
-        if ($resolvedPlanId === 0) {
-            return [
-                'status' => 422,
-                'data' => ['error' => 'vip_plan_id e obrigatorio.'],
-            ];
-        }
-
-        $plan = $this->vips->findPlanById($resolvedPlanId);
+        $plan = $this->vips->findPlanById($planId);
         if ($plan === null) {
             return [
                 'status' => 404,
@@ -118,7 +110,7 @@ final class PaymentController
             ];
         }
 
-        $vip = $this->vips->renewVip((int) $payment['user_id'], $resolvedPlanId, (int) $plan['duration_days']);
+        $vip = $this->vips->renewVip((int) $payment['user_id'], $planId, (int) $plan['duration_days']);
 
         $this->logs->create('payment_confirm', (int) $payment['user_id'], [
             'payment_id' => $paymentId,
@@ -134,16 +126,6 @@ final class PaymentController
                 ],
                 'vip' => $vip,
             ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function list(): array
-    {
-        return [
-            'payments' => $this->payments->listRecent(),
         ];
     }
 

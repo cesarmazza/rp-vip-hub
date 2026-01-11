@@ -22,29 +22,6 @@ final class VipRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function listVipEntries(int $limit = 50): array
-    {
-        $pdo = Database::connection();
-        $limit = max(1, min($limit, 200));
-        $stmt = $pdo->prepare(
-            'SELECT user_vips.id, user_vips.user_id, user_vips.status, user_vips.expires_at, '
-            . 'users.username, users.discord_id, vip_plans.name AS plan_name, vip_plans.price AS plan_price '
-            . 'FROM user_vips '
-            . 'INNER JOIN users ON users.id = user_vips.user_id '
-            . 'INNER JOIN vip_plans ON vip_plans.id = user_vips.vip_plan_id '
-            . 'ORDER BY user_vips.expires_at DESC '
-            . 'LIMIT :limit'
-        );
-        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
-        $stmt->execute();
-        $vips = $stmt->fetchAll();
-
-        return is_array($vips) ? $vips : [];
-    }
-
-    /**
      * @return array<string, mixed>|null
      */
     public function findPlanById(int $id): ?array

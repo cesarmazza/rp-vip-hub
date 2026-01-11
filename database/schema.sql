@@ -38,17 +38,14 @@ CREATE TABLE `user_vips` (
 CREATE TABLE `payments` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
-  `vip_plan_id` BIGINT UNSIGNED NOT NULL,
   `amount` DECIMAL(10,2) NOT NULL,
   `method` VARCHAR(50) NOT NULL,
   `status` VARCHAR(30) NOT NULL DEFAULT 'pending',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_payments_user_id` (`user_id`),
-  KEY `idx_payments_plan_id` (`vip_plan_id`),
   KEY `idx_payments_status` (`status`),
-  CONSTRAINT `fk_payments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_payments_plan` FOREIGN KEY (`vip_plan_id`) REFERENCES `vip_plans` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  CONSTRAINT `fk_payments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `logs` (
