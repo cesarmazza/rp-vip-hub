@@ -1,19 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Filter, Download, AlertCircle, CheckCircle, Info, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const logsData = [
-  { id: 1, type: "success", action: "VIP Ativado", description: "Carlos_RP ativou VIP Black via PIX", time: "14:32", date: "11/01/2025" },
-  { id: 2, type: "info", action: "Login Admin", description: "Admin logou no painel", time: "14:30", date: "11/01/2025" },
-  { id: 3, type: "warning", action: "Pagamento Pendente", description: "Pedro_Gang iniciou pagamento mas não finalizou", time: "11:45", date: "11/01/2025" },
-  { id: 4, type: "success", action: "VIP Renovado", description: "Maria_City renovou VIP Plus", time: "12:15", date: "11/01/2025" },
-  { id: 5, type: "error", action: "Pagamento Falhou", description: "Lucas_Mafia - erro na transação PIX", time: "16:55", date: "10/01/2025" },
-  { id: 6, type: "info", action: "Configuração", description: "Admin alterou preço do VIP Black", time: "15:20", date: "10/01/2025" },
-  { id: 7, type: "success", action: "VIP Ativado", description: "Ana_Police ativou VIP Black via PIX", time: "18:20", date: "10/01/2025" },
-  { id: 8, type: "warning", action: "VIP Expirando", description: "5 VIPs expiram nos próximos 3 dias", time: "09:00", date: "10/01/2025" },
-  { id: 9, type: "success", action: "VIP Ativado", description: "Julia_Medic ativou VIP Básico via PIX", time: "14:30", date: "10/01/2025" },
-  { id: 10, type: "info", action: "Backup", description: "Backup automático do banco de dados realizado", time: "03:00", date: "10/01/2025" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { ApiError, getLogs, hasAuthToken } from "@/lib/api";
 
 const getLogIcon = (type: string) => {
   switch (type) {
@@ -34,6 +23,50 @@ const getLogStyle = (type: string) => {
 };
 
 const DashboardLogs = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["logs"],
+    queryFn: getLogs,
+    enabled: hasAuthToken(),
+  });
+  const logsData = data?.logs ?? [];
+  const errorMessage =
+    error instanceof ApiError
+      ? error.status === 401
+        ? "Faça login para visualizar os logs."
+        : error.message
+      : null;
+  const formatDate = (value: string) => new Date(value);
+  const getLogType = (action: string) => {
+    if (action.includes("vip")) {
+      return "success";
+    }
+    if (action.includes("payment")) {
+      return "warning";
+    }
+    if (action.includes("error")) {
+      return "error";
+    }
+    return "info";
+  };
+  const getLogLabel = (action: string) =>
+    action
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  const getLogDescription = (action: string, data?: string | null) => {
+    if (!data) {
+      return `Evento: ${action}`;
+    }
+    try {
+      const parsed = JSON.parse(data) as Record<string, unknown>;
+      return `${action}: ${Object.entries(parsed)
+        .map(([key, value]) => `${key}=${value}`)
+        .join(", ")}`;
+    } catch {
+      return `Evento: ${action}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -76,8 +109,19 @@ const DashboardLogs = () => {
       {/* Logs List */}
       <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: "0.2s" }}>
         <div className="divide-y divide-border/20">
+          {isLoading && (
+            <div className="p-4 text-muted-foreground">Carregando logs...</div>
+          )}
+          {errorMessage && (
+            <div className="p-4 text-destructive">{errorMessage}</div>
+          )}
+          {!isLoading && !errorMessage && logsData.length === 0 && (
+            <div className="p-4 text-muted-foreground">Nenhum log encontrado.</div>
+          )}
           {logsData.map((log, index) => {
-            const Icon = getLogIcon(log.type);
+            const type = getLogType(log.action);
+            const Icon = getLogIcon(type);
+            const logDate = formatDate(log.created_at);
             return (
               <div 
                 key={log.id}
@@ -86,27 +130,33 @@ const DashboardLogs = () => {
               >
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
-                  getLogStyle(log.type)
+                  getLogStyle(type)
                 )}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold font-display">{log.action}</span>
+                    <span className="font-semibold font-display">{getLogLabel(log.action)}</span>
                     <span className={cn(
                       "px-2 py-0.5 rounded text-xs font-medium border",
-                      getLogStyle(log.type)
+                      getLogStyle(type)
                     )}>
-                      {log.type === "success" ? "Sucesso" : 
-                       log.type === "error" ? "Erro" :
-                       log.type === "warning" ? "Aviso" : "Info"}
+                      {type === "success" ? "Sucesso" : 
+                       type === "error" ? "Erro" :
+                       type === "warning" ? "Aviso" : "Info"}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{log.description}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {getLogDescription(log.action, log.data)}
+                  </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-medium">{log.time}</div>
-                  <div className="text-xs text-muted-foreground">{log.date}</div>
+                  <div className="text-sm font-medium">
+                    {logDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {logDate.toLocaleDateString("pt-BR")}
+                  </div>
                 </div>
               </div>
             );

@@ -1,17 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Download, Filter, QrCode, CheckCircle, Clock, XCircle, TrendingUp, DollarSign, CreditCard } from "lucide-react";
 import MetricCard from "@/components/dashboard/MetricCard";
-
-const paymentsData = [
-  { id: 1, player: "Carlos_RP", amount: "R$ 79,90", method: "PIX", status: "completed", date: "11/01/2025 14:32", plan: "VIP Black" },
-  { id: 2, player: "Maria_City", amount: "R$ 39,90", method: "PIX", status: "completed", date: "11/01/2025 12:15", plan: "VIP Plus" },
-  { id: 3, player: "Pedro_Gang", amount: "R$ 19,90", method: "PIX", status: "pending", date: "11/01/2025 11:45", plan: "VIP Básico" },
-  { id: 4, player: "Ana_Police", amount: "R$ 79,90", method: "PIX", status: "completed", date: "10/01/2025 18:20", plan: "VIP Black" },
-  { id: 5, player: "Lucas_Mafia", amount: "R$ 39,90", method: "PIX", status: "failed", date: "10/01/2025 16:55", plan: "VIP Plus" },
-  { id: 6, player: "Julia_Medic", amount: "R$ 19,90", method: "PIX", status: "completed", date: "10/01/2025 14:30", plan: "VIP Básico" },
-  { id: 7, player: "Bruno_Taxi", amount: "R$ 39,90", method: "PIX", status: "completed", date: "09/01/2025 20:15", plan: "VIP Plus" },
-  { id: 8, player: "Fernanda_EMS", amount: "R$ 79,90", method: "PIX", status: "completed", date: "09/01/2025 16:40", plan: "VIP Black" },
-];
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ApiError, getPayments, hasAuthToken } from "@/lib/api";
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -38,6 +30,43 @@ const getStatusLabel = (status: string) => {
 };
 
 const DashboardPayments = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["payments"],
+    queryFn: getPayments,
+    enabled: hasAuthToken(),
+  });
+  const paymentsData = data?.payments ?? [];
+  const errorMessage =
+    error instanceof ApiError
+      ? error.status === 401
+        ? "Faça login para visualizar pagamentos."
+        : error.message
+      : null;
+  const formatCurrency = (value: number) =>
+    value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const normalizeStatus = (status: string) => {
+    if (status === "paid") {
+      return "completed";
+    }
+    if (status === "pending") {
+      return "pending";
+    }
+    return "failed";
+  };
+  const metrics = useMemo(() => {
+    const paidPayments = paymentsData.filter((payment) => payment.status === "paid");
+    const totalPaid = paidPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const successRate = paymentsData.length
+      ? (paidPayments.length / paymentsData.length) * 100
+      : 0;
+
+    return {
+      totalPaid,
+      totalCount: paymentsData.length,
+      successRate,
+    };
+  }, [paymentsData]);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -62,25 +91,25 @@ const DashboardPayments = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in" style={{ animationDelay: "0.1s" }}>
         <MetricCard
           title="Receita Total (Janeiro)"
-          value="R$ 12.458"
-          change="+23%"
-          changeType="positive"
+          value={isLoading ? "Carregando..." : formatCurrency(metrics.totalPaid)}
+          change="—"
+          changeType="neutral"
           icon={DollarSign}
           iconColor="secondary"
         />
         <MetricCard
           title="Transações"
-          value="156"
-          change="+18"
-          changeType="positive"
+          value={isLoading ? "Carregando..." : String(metrics.totalCount)}
+          change="—"
+          changeType="neutral"
           icon={CreditCard}
           iconColor="primary"
         />
         <MetricCard
           title="Taxa de Sucesso"
-          value="94.2%"
-          change="+2.1%"
-          changeType="positive"
+          value={isLoading ? "Carregando..." : `${metrics.successRate.toFixed(1)}%`}
+          change="—"
+          changeType="neutral"
           icon={TrendingUp}
         />
       </div>
@@ -104,41 +133,67 @@ const DashboardPayments = () => {
               </tr>
             </thead>
             <tbody>
-              {paymentsData.map((payment, index) => (
-                <tr 
-                  key={payment.id} 
-                  className="border-b border-border/20 hover:bg-muted/20 transition-colors animate-fade-in"
-                  style={{ animationDelay: `${0.1 + index * 0.03}s` }}
-                >
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <QrCode className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <div className="font-medium font-mono text-sm">#PIX-{String(payment.id).padStart(4, "0")}</div>
-                        <div className="text-xs text-muted-foreground">{payment.method}</div>
-                      </div>
-                    </div>
+              {isLoading && (
+                <tr>
+                  <td className="p-4 text-muted-foreground" colSpan={6}>
+                    Carregando pagamentos...
                   </td>
-                  <td className="p-4">
-                    <div className="font-medium">{payment.player}</div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-primary font-medium">{payment.plan}</span>
-                  </td>
-                  <td className="p-4">
-                    <span className="font-bold text-secondary">{payment.amount}</span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusStyle(payment.status)}`}>
-                      {getStatusIcon(payment.status)}
-                      {getStatusLabel(payment.status)}
-                    </span>
-                  </td>
-                  <td className="p-4 text-muted-foreground text-sm">{payment.date}</td>
                 </tr>
-              ))}
+              )}
+              {errorMessage && (
+                <tr>
+                  <td className="p-4 text-destructive" colSpan={6}>
+                    {errorMessage}
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !errorMessage && paymentsData.length === 0 && (
+                <tr>
+                  <td className="p-4 text-muted-foreground" colSpan={6}>
+                    Nenhum pagamento encontrado.
+                  </td>
+                </tr>
+              )}
+              {paymentsData.map((payment, index) => {
+                const status = normalizeStatus(payment.status);
+                return (
+                  <tr 
+                    key={payment.id} 
+                    className="border-b border-border/20 hover:bg-muted/20 transition-colors animate-fade-in"
+                    style={{ animationDelay: `${0.1 + index * 0.03}s` }}
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                          <QrCode className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium font-mono text-sm">#PIX-{String(payment.id).padStart(4, "0")}</div>
+                          <div className="text-xs text-muted-foreground">{payment.method}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="font-medium">{payment.username}</div>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-primary font-medium">{payment.plan_name}</span>
+                    </td>
+                    <td className="p-4">
+                      <span className="font-bold text-secondary">{formatCurrency(payment.amount)}</span>
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusStyle(status)}`}>
+                        {getStatusIcon(status)}
+                        {getStatusLabel(status)}
+                      </span>
+                    </td>
+                    <td className="p-4 text-muted-foreground text-sm">
+                      {new Date(payment.created_at).toLocaleString("pt-BR")}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

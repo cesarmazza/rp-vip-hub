@@ -8,23 +8,46 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
-
-const stats = [
-  { label: "Usuários VIP", value: "1,284", icon: Users, change: "+12%" },
-  { label: "Receita Mensal", value: "R$ 45.890", icon: DollarSign, change: "+23%" },
-  { label: "Taxa de Conversão", value: "68%", icon: TrendingUp, change: "+5%" },
-  { label: "VIPs Ativos", value: "892", icon: Crown, change: "+8%" },
-];
-
-const vipUsers = [
-  { id: 1, name: "Carlos_Silva", discord: "carlos#1234", plan: "VIP Black", status: "active", expires: "15/02/2025" },
-  { id: 2, name: "Maria_Santos", discord: "maria#5678", plan: "VIP Plus", status: "active", expires: "28/01/2025" },
-  { id: 3, name: "Pedro_Costa", discord: "pedro#9012", plan: "VIP Básico", status: "expired", expires: "10/01/2025" },
-  { id: 4, name: "Ana_Oliveira", discord: "ana#3456", plan: "VIP Black", status: "active", expires: "05/03/2025" },
-  { id: 5, name: "Lucas_Ferreira", discord: "lucas#7890", plan: "VIP Plus", status: "active", expires: "20/02/2025" },
-];
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ApiError, getDashboardMetrics, getVips, hasAuthToken } from "@/lib/api";
 
 const Dashboard = () => {
+  const isAuthenticated = hasAuthToken();
+  const { data: metrics, error: metricsError } = useQuery({
+    queryKey: ["dashboard-metrics"],
+    queryFn: getDashboardMetrics,
+    enabled: isAuthenticated,
+  });
+  const { data: vipsData, error: vipsError } = useQuery({
+    queryKey: ["vips"],
+    queryFn: getVips,
+    enabled: isAuthenticated,
+  });
+  const formatCurrency = (value: number | undefined) =>
+    (value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const stats = useMemo(() => [
+    { label: "Usuários VIP", value: String(metrics?.vips_ativos ?? 0), icon: Users, change: "—" },
+    { label: "Receita Mensal", value: formatCurrency(metrics?.receita_mes), icon: DollarSign, change: "—" },
+    { label: "Taxa de Conversão", value: "—", icon: TrendingUp, change: "—" },
+    { label: "VIPs Ativos", value: String(metrics?.vips_ativos ?? 0), icon: Crown, change: "—" },
+  ], [metrics]);
+  const vipUsers = useMemo(() => {
+    const entries = vipsData?.vips ?? [];
+    return entries.slice(0, 5).map((vip) => ({
+      id: vip.id,
+      name: vip.username,
+      discord: vip.discord_id,
+      plan: vip.plan_name,
+      status: vip.status,
+      expires: new Date(vip.expires_at).toLocaleDateString("pt-BR"),
+    }));
+  }, [vipsData]);
+  const errorMessage =
+    metricsError instanceof ApiError || vipsError instanceof ApiError
+      ? "Faça login para visualizar os dados completos."
+      : null;
+
   return (
     <section className="py-24 relative">
       <div className="container px-4 md:px-6">
@@ -40,6 +63,9 @@ const Dashboard = () => {
 
         {/* Dashboard Preview */}
         <div className="glass-card p-4 md:p-8 neon-glow animate-fade-in">
+          {errorMessage && (
+            <div className="mb-6 text-sm text-muted-foreground">{errorMessage}</div>
+          )}
           {/* Dashboard Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -86,6 +112,13 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {vipUsers.length === 0 && (
+                    <tr>
+                      <td className="p-4 text-muted-foreground" colSpan={6}>
+                        Nenhum VIP encontrado.
+                      </td>
+                    </tr>
+                  )}
                   {vipUsers.map((user) => (
                     <tr key={user.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
                       <td className="p-4">

@@ -1,14 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { MoreVertical, RefreshCw, XCircle, Crown, Zap, Star } from "lucide-react";
-
-const vipData = [
-  { id: 1, player: "Carlos_RP", discord: "carlos#1234", type: "VIP Black", status: "active", expires: "15/02/2025", revenue: "R$ 79,90" },
-  { id: 2, player: "Maria_City", discord: "maria#5678", type: "VIP Plus", status: "active", expires: "28/01/2025", revenue: "R$ 39,90" },
-  { id: 3, player: "Pedro_Gang", discord: "pedro#9012", type: "VIP Básico", status: "expired", expires: "10/01/2025", revenue: "R$ 19,90" },
-  { id: 4, player: "Ana_Police", discord: "ana#3456", type: "VIP Black", status: "active", expires: "05/03/2025", revenue: "R$ 79,90" },
-  { id: 5, player: "Lucas_Mafia", discord: "lucas#7890", type: "VIP Plus", status: "active", expires: "20/02/2025", revenue: "R$ 39,90" },
-  { id: 6, player: "Julia_Medic", discord: "julia#2345", type: "VIP Básico", status: "pending", expires: "25/01/2025", revenue: "R$ 19,90" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { ApiError, getVips, hasAuthToken } from "@/lib/api";
 
 const getVIPIcon = (type: string) => {
   switch (type) {
@@ -30,6 +23,7 @@ const getStatusStyle = (status: string) => {
   switch (status) {
     case "active": return "status-active";
     case "expired": return "status-expired";
+    case "suspended": return "bg-destructive/20 text-destructive border border-destructive/30 px-3 py-1 rounded-full text-xs font-medium";
     default: return "bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 px-3 py-1 rounded-full text-xs font-medium";
   }
 };
@@ -38,11 +32,29 @@ const getStatusLabel = (status: string) => {
   switch (status) {
     case "active": return "Ativo";
     case "expired": return "Expirado";
+    case "suspended": return "Suspenso";
     default: return "Pendente";
   }
 };
 
 const VIPTable = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["vips"],
+    queryFn: getVips,
+    enabled: hasAuthToken(),
+  });
+  const vipData = data?.vips ?? [];
+  const errorMessage =
+    error instanceof ApiError
+      ? error.status === 401
+        ? "Faça login para visualizar os VIPs."
+        : error.message
+      : null;
+  const formatCurrency = (value: number) =>
+    value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const formatDate = (value: string) =>
+    new Date(value).toLocaleDateString("pt-BR");
+
   return (
     <div className="glass-card overflow-hidden">
       <div className="p-6 border-b border-border/50 flex items-center justify-between">
@@ -68,6 +80,27 @@ const VIPTable = () => {
             </tr>
           </thead>
           <tbody>
+            {isLoading && (
+              <tr>
+                <td className="p-4 text-muted-foreground" colSpan={6}>
+                  Carregando VIPs...
+                </td>
+              </tr>
+            )}
+            {errorMessage && (
+              <tr>
+                <td className="p-4 text-destructive" colSpan={6}>
+                  {errorMessage}
+                </td>
+              </tr>
+            )}
+            {!isLoading && !errorMessage && vipData.length === 0 && (
+              <tr>
+                <td className="p-4 text-muted-foreground" colSpan={6}>
+                  Nenhum VIP encontrado.
+                </td>
+              </tr>
+            )}
             {vipData.map((vip, index) => (
               <tr 
                 key={vip.id} 
@@ -78,19 +111,19 @@ const VIPTable = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
                       <span className="text-sm font-bold text-primary font-display">
-                        {vip.player.charAt(0)}
+                        {vip.username.charAt(0)}
                       </span>
                     </div>
                     <div>
-                      <div className="font-medium">{vip.player}</div>
-                      <div className="text-xs text-muted-foreground">{vip.discord}</div>
+                      <div className="font-medium">{vip.username}</div>
+                      <div className="text-xs text-muted-foreground">{vip.discord_id}</div>
                     </div>
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getVIPStyle(vip.type)}`}>
-                    {getVIPIcon(vip.type)}
-                    {vip.type}
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getVIPStyle(vip.plan_name)}`}>
+                    {getVIPIcon(vip.plan_name)}
+                    {vip.plan_name}
                   </span>
                 </td>
                 <td className="p-4">
@@ -98,8 +131,8 @@ const VIPTable = () => {
                     {getStatusLabel(vip.status)}
                   </span>
                 </td>
-                <td className="p-4 text-muted-foreground hidden lg:table-cell">{vip.expires}</td>
-                <td className="p-4 font-medium text-secondary hidden md:table-cell">{vip.revenue}</td>
+                <td className="p-4 text-muted-foreground hidden lg:table-cell">{formatDate(vip.expires_at)}</td>
+                <td className="p-4 font-medium text-secondary hidden md:table-cell">{formatCurrency(vip.plan_price)}</td>
                 <td className="p-4">
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="ghost" size="sm" className="text-xs gap-1.5 text-primary hover:text-primary hover:bg-primary/10">

@@ -1,25 +1,44 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, UserPlus, Crown, Calendar, MoreVertical } from "lucide-react";
-
-const playersData = [
-  { id: 1, name: "Carlos_RP", discord: "carlos#1234", status: "online", vip: "VIP Black", joined: "15/06/2024", lastSeen: "Agora" },
-  { id: 2, name: "Maria_City", discord: "maria#5678", status: "online", vip: "VIP Plus", joined: "20/08/2024", lastSeen: "Agora" },
-  { id: 3, name: "Pedro_Gang", discord: "pedro#9012", status: "offline", vip: null, joined: "10/09/2024", lastSeen: "2h atrás" },
-  { id: 4, name: "Ana_Police", discord: "ana#3456", status: "online", vip: "VIP Black", joined: "05/07/2024", lastSeen: "Agora" },
-  { id: 5, name: "Lucas_Mafia", discord: "lucas#7890", status: "offline", vip: "VIP Plus", joined: "12/10/2024", lastSeen: "1d atrás" },
-  { id: 6, name: "Julia_Medic", discord: "julia#2345", status: "online", vip: "VIP Básico", joined: "25/11/2024", lastSeen: "Agora" },
-  { id: 7, name: "Bruno_Taxi", discord: "bruno#6789", status: "offline", vip: null, joined: "30/12/2024", lastSeen: "5h atrás" },
-  { id: 8, name: "Fernanda_EMS", discord: "fer#0123", status: "online", vip: "VIP Plus", joined: "08/01/2025", lastSeen: "Agora" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { ApiError, getVips, hasAuthToken } from "@/lib/api";
 
 const DashboardPlayers = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["vips"],
+    queryFn: getVips,
+    enabled: hasAuthToken(),
+  });
+  const playersData = useMemo(() => {
+    const vips = data?.vips ?? [];
+    const uniquePlayers = new Map<number, { id: number; name: string; discord: string; vip: string | null; expiresAt: string }>();
+    vips.forEach((vip) => {
+      if (!uniquePlayers.has(vip.user_id)) {
+        uniquePlayers.set(vip.user_id, {
+          id: vip.user_id,
+          name: vip.username,
+          discord: vip.discord_id,
+          vip: vip.plan_name,
+          expiresAt: vip.expires_at,
+        });
+      }
+    });
+    return Array.from(uniquePlayers.values());
+  }, [data]);
+  const errorMessage =
+    error instanceof ApiError
+      ? error.status === 401
+        ? "Faça login para visualizar jogadores."
+        : error.message
+      : null;
 
   const filteredPlayers = playersData.filter(player => 
     player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     player.discord.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const formatDate = (value: string) => new Date(value).toLocaleDateString("pt-BR");
 
   return (
     <div className="space-y-6">
@@ -55,6 +74,15 @@ const DashboardPlayers = () => {
 
       {/* Players Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in" style={{ animationDelay: "0.2s" }}>
+        {isLoading && (
+          <div className="text-muted-foreground">Carregando jogadores...</div>
+        )}
+        {errorMessage && (
+          <div className="text-destructive">{errorMessage}</div>
+        )}
+        {!isLoading && !errorMessage && filteredPlayers.length === 0 && (
+          <div className="text-muted-foreground">Nenhum jogador encontrado.</div>
+        )}
         {filteredPlayers.map((player, index) => (
           <div 
             key={player.id}
@@ -69,9 +97,7 @@ const DashboardPlayers = () => {
                       {player.name.charAt(0)}
                     </span>
                   </div>
-                  <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-card ${
-                    player.status === "online" ? "bg-secondary" : "bg-muted-foreground"
-                  }`} />
+                  <span className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-card bg-secondary" />
                 </div>
                 <div>
                   <h3 className="font-semibold font-display">{player.name}</h3>
@@ -97,13 +123,13 @@ const DashboardPlayers = () => {
               )}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>Desde {player.joined}</span>
+                <span>Expira em {formatDate(player.expiresAt)}</span>
               </div>
             </div>
 
             <div className="mt-4 pt-4 border-t border-border/30 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                {player.status === "online" ? "🟢 Online" : `⚫ ${player.lastSeen}`}
+                {player.vip ? "🟢 VIP ativo" : "⚫ Sem VIP"}
               </span>
               <Button variant="glass" size="sm" className="text-xs h-7">
                 Ver Perfil
