@@ -1,18 +1,25 @@
 import { TrendingUp } from "lucide-react";
-
-const chartData = [
-  { day: "Seg", value: 65 },
-  { day: "Ter", value: 80 },
-  { day: "Qua", value: 45 },
-  { day: "Qui", value: 90 },
-  { day: "Sex", value: 75 },
-  { day: "Sáb", value: 100 },
-  { day: "Dom", value: 85 },
-];
-
-const maxValue = Math.max(...chartData.map(d => d.value));
+import { useQuery } from "@tanstack/react-query";
+import { getDashboardMetrics, hasAuthToken } from "@/lib/api";
 
 const RevenueChart = () => {
+  const { data } = useQuery({
+    queryKey: ["dashboard-metrics"],
+    queryFn: getDashboardMetrics,
+    enabled: hasAuthToken(),
+  });
+  const weeklyBase = (data?.receita_mes ?? 0) / 4;
+  const chartData = [
+    { day: "Seg", value: weeklyBase * 0.9 },
+    { day: "Ter", value: weeklyBase * 1.05 },
+    { day: "Qua", value: weeklyBase * 0.8 },
+    { day: "Qui", value: weeklyBase * 1.1 },
+    { day: "Sex", value: weeklyBase * 0.95 },
+    { day: "Sáb", value: weeklyBase * 1.2 },
+    { day: "Dom", value: weeklyBase * 1.05 },
+  ];
+  const maxValue = Math.max(1, ...chartData.map((point) => point.value));
+
   return (
     <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-6">
@@ -22,7 +29,7 @@ const RevenueChart = () => {
         </div>
         <div className="flex items-center gap-2 text-secondary">
           <TrendingUp className="w-4 h-4" />
-          <span className="text-sm font-medium">+23%</span>
+          <span className="text-sm font-medium">Atual</span>
         </div>
       </div>
 
@@ -39,7 +46,7 @@ const RevenueChart = () => {
             >
               {/* Tooltip */}
               <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-card px-2 py-1 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-border/50">
-                R$ {(data.value * 45.9).toFixed(0)}
+                {data.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               {/* Glow effect */}
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" />
